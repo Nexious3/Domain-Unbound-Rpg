@@ -1,9 +1,13 @@
+// app.js - Player 6 (UI Render Engine) - Integrated with Players 1, 2, 3, and 4
+
 // Local snapshot memory to decouple tick updates from DOM layout engines
 let cachedGameState = null;
+let currentCombatInstance = null; // Track active Player 3 CombatEngine references
 
 document.addEventListener("DOMContentLoaded", () => {
     initNavigation();
     startRenderLoop();
+    initCombatButtonListeners();
     window.appendCombatLog("System execution stable. Ready for data transmission.", "system");
 });
 
@@ -47,12 +51,73 @@ function startRenderLoop() {
         if (cachedGameState) {
             document.getElementById("hud-grade").innerText = cachedGameState.grade || "4th Grade";
             document.getElementById("hud-ce").innerText = Math.floor(cachedGameState.cursedEnergy || 0).toLocaleString();
-            document.getElementById("hud-level").innerText = cachedGameState.level || 1;
+            document.getElementById("hud-level").innerText = cachedGameState.sorcererLevel || cachedGameState.level || 1;
+            
+            // Dynamic Button State Toggles based on available resources
+            const cePool = currentCombatInstance ? currentCombatInstance.playerCombatCE : cachedGameState.cursedEnergy;
+            
+            const techBtn = document.getElementById("btn-technique");
+            if (techBtn) techBtn.disabled = cePool < 40;
+
+            const domainBtn = document.getElementById("domain-expansion-btn");
+            if (domainBtn) {
+                const domainCost = window.playerAbilitiesState?.domainCeCost || 100;
+                const isFried = window.playerAbilitiesState?.brainFryTurns > 0;
+                domainBtn.disabled = cePool < domainCost || isFried || (currentCombatInstance && currentCombatInstance.isDomainActive);
+            }
         }
         requestAnimationFrame(render);
     }
     requestAnimationFrame(render);
 }
+
+// Wire up Combat Screen Button Listeners
+function initCombatButtonListeners() {
+    const handleAction = (choice) => {
+        if (!currentCombatInstance) {
+            window.appendCombatLog("❌ No active mission tracking initialized. Choose a mission first!", "system");
+            return;
+        }
+        
+        // Execute Player 3 Combat Logic Turn loop execution
+        const summary = currentCombatInstance.processTurn(choice);
+        
+        // Display logs returned by the execution loop
+        summary.logs.forEach(msg => {
+            let logType = "system";
+            if (msg.includes("punch") || msg.includes("Technique") || msg.includes("DOMAIN")) logType = "player";
+            if (msg.includes("counters") || msg.includes("overwhelmed")) logType = "enemy";
+            window.appendCombatLog(msg, logType);
+        });
+
+        // Add a visual hit shake impact animation to the layout viewport
+        const combatScreen = document.getElementById("combat-screen");
+        combatScreen.style.transform = "scale(0.98)";
+        setTimeout(() => combatScreen.style.transform = "scale(1)", 100);
+
+        // Resolve End-of-Battle States
+        if (summary.status === "VICTORY" || summary.status === "DEFEAT") {
+            document.getElementById("btn-attack").disabled = true;
+            document.getElementById("btn-technique").disabled = true;
+            document.getElementById("domain-expansion-btn").disabled = true;
+            currentCombatInstance = null; // Wipe combat instances reference pointers
+        }
+    };
+
+    document.getElementById("btn-attack").addEventListener("click", () => handleAction("basic"));
+    document.getElementById("btn-technique").addEventListener("click", () => handleAction("technique"));
+    document.getElementById("domain-expansion-btn").addEventListener("click", () => handleAction("domain"));
+}
+
+/**
+ * EXTERNAL MISSION HOOK: Triggered when selecting an enemy target module configuration array
+ * @param {CombatEngine} combatEngineInstance - An initialized instance of Player 3's CombatEngine
+ */
+window.startActiveCombatEngineSession = function(combatEngineInstance) {
+    currentCombatInstance = combatEngineInstance;
+    document.getElementById("btn-attack").disabled = false;
+    window.appendCombatLog(`⚠️ Combat Engagement Initiated: ${combatEngineInstance.enemy.name} detected!`, "enemy");
+};
 
 // Dynamic Template Engine: Generates Upgrades dynamically for Player 2
 window.renderTrainingNodes = function(nodesArray) {
@@ -69,7 +134,6 @@ window.renderTrainingNodes = function(nodesArray) {
                 Train (Cost: ${node.cost} CE)
             </button>
         `;
-        // Safely wire logic context directly back to Player 2 action script execution hooks
         card.querySelector("button").addEventListener("click", () => {
             if (typeof window.buyTraining === "function") window.buyTraining(node.id);
         });
@@ -89,12 +153,9 @@ window.renderAbilitiesNodes = function(abilitiesArray) {
             <h3>${ability.name}</h3>
             <p>${ability.description}</p>
             <button class="action-btn" id="ability-btn-${ability.id}">
-                Unlock (${ability.cost} CE)
+                Unlocked Passively
             </button>
         `;
-        card.querySelector("button").addEventListener("click", () => {
-            if (typeof window.unlockAbility === "function") window.unlockAbility(ability.id);
-        });
         list.appendChild(card);
     });
 };
@@ -102,8 +163,9 @@ window.renderAbilitiesNodes = function(abilitiesArray) {
 // Scrolling Feed Logic
 window.appendCombatLog = function(message, type = "system") {
     const logBox = document.getElementById("combat-log");
-    const logEntry = document.createElement("p");
+    if (!logBox) return;
     
+    const logEntry = document.createElement("p");
     logEntry.className = `log-${type}`;
     logEntry.innerText = `[${new Date().toLocaleTimeString()}] ${message}`;
     
@@ -111,17 +173,17 @@ window.appendCombatLog = function(message, type = "system") {
     logBox.scrollTop = logBox.scrollHeight;
 };
 
-// Visual FX Trigger Hook: Used by Player 4 when Domain triggers
+// Visual FX Trigger Hook: Used by Player 4 & 3 when Domain triggers
 window.triggerDomainVisuals = function(domainName) {
     const overlay = document.getElementById("domain-overlay");
+    if (!overlay) return;
+    
     const title = overlay.querySelector(".domain-title");
     
     title.innerText = domainName.toUpperCase();
     overlay.classList.remove("hidden");
     overlay.classList.add("animate");
     
-    window.appendCombatLog(`DOMAIN EXPANSION: ${domainName} !!`, "player");
-
     setTimeout(() => {
         overlay.classList.remove("animate");
         overlay.classList.add("hidden");
