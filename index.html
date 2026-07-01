@@ -25,7 +25,8 @@
                 <section id="training-panel" class="panel">
                     <h2>Physical & Spiritual Discipline</h2>
                     <div class="card-grid" id="training-list">
-                        </div>
+                        <!-- Instantiated Dynamically via Player 2 (training.js) -->
+                    </div>
                 </section>
 
                 <section id="combat-panel" class="panel">
@@ -38,26 +39,37 @@
                             <button id="domain-expansion-btn" class="domain-btn" disabled>DOMAIN EXPANSION</button>
                         </div>
                     </div>
+
+                    <!-- Target Canvas Array Area managed dynamically by Player 6 (app.js) -->
+                    <div class="card-grid" id="mission-selection-list" style="margin-top: 20px;">
+                        <!-- Enemy Cursed Spirits Spawn Here -->
+                    </div>
                 </section>
 
                 <section id="domain-panel" class="panel">
                     <h2>Innate Techniques & Domains</h2>
                     <div class="card-grid" id="abilities-list">
-                        </div>
+                        <!-- Instantiated Dynamically via Player 4 (abilities.js) -->
+                    </div>
                 </section>
             </main>
         </div>
     </div>
 
+    <!-- Fullscreen Visual Animation Portal managed via Player 6 and triggered by Player 4 -->
     <div id="domain-overlay" class="hidden">
         <h1 class="domain-title">DOMAIN EXPANSION</h1>
     </div>
 
-    <script src="state.js"></script>
-    <script src="training.js"></script>
-    <script src="combat.js"></script>
-    <script src="abilities.js"></script>
-    <script src="assets.js"></script>
-    <script src="app.js"></script>
+    <!-- 
+      CRITICAL REPAIR: Script files converted to type="module". 
+      Fixes the browser core security execution boundary errors. 
+    -->
+    <script type="module" src="state.js"></script>
+    <script type="module" src="training.js"></script>
+    <script type="module" src="combat.js"></script>
+    <script type="module" src="abilities.js"></script>
+    <script type="module" src="assets.js"></script>
+    <script type="module" src="app.js"></script>
 </body>
 </html>
