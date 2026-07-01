@@ -1,4 +1,4 @@
-class coreState{
+class CoreState{
     constructor(){
         this.grade = 1;// ранга на играча
         this.CursedEnergy = 0; //ресурсът, който се генерира всяка секунда
