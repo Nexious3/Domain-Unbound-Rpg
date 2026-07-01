@@ -1,0 +1,188 @@
+/* Core Dark, Anime-Themed Styles */
+:root {
+    --bg-dark: #0a0a0c;
+    --panel-bg: #121216;
+    --border-color: #2a2a35;
+    --text-main: #e2e2e9;
+    --text-muted: #8a8a9e;
+    --curse-blue: #00d2ff;
+    --domain-red: #ff0055;
+}
+
+body {
+    margin: 0;
+    font-family: 'Courier New', Courier, monospace;
+    background-color: var(--bg-dark);
+    color: var(--text-main);
+    user-select: none;
+}
+
+#game-container {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+}
+
+/* TOP HUD */
+#hud {
+    display: flex;
+    justify-content: space-around;
+    background-color: var(--panel-bg);
+    padding: 15px;
+    border-bottom: 2px solid var(--border-color);
+}
+.stat-box {
+    font-weight: bold;
+    letter-spacing: 1px;
+}
+#hud-ce {
+    color: var(--curse-blue);
+    text-shadow: 0 0 5px rgba(0, 210, 255, 0.5);
+}
+
+/* MAIN LAYOUT */
+#main-layout {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+}
+
+#sidebar {
+    width: 200px;
+    background-color: var(--panel-bg);
+    border-right: 2px solid var(--border-color);
+    display: flex;
+    flex-direction: column;
+    padding: 10px;
+    gap: 10px;
+}
+
+/* NAVIGATION & CURSED ENERGY AURA FX */
+@keyframes cursed-pulse {
+    0% { box-shadow: 0 0 5px rgba(0, 210, 255, 0.1); }
+    50% { box-shadow: 0 0 15px rgba(0, 210, 255, 0.4); border-color: var(--curse-blue); }
+    100% { box-shadow: 0 0 5px rgba(0, 210, 255, 0.1); }
+}
+
+.nav-btn {
+    background: transparent;
+    border: 1px solid var(--border-color);
+    color: var(--text-muted);
+    padding: 12px;
+    text-align: left;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+.nav-btn:hover, .nav-btn.active {
+    color: var(--text-main);
+    background: rgba(0, 210, 255, 0.05);
+    animation: cursed-pulse 2s infinite ease-in-out;
+}
+
+/* VIEWPORT & PANELS */
+#viewport {
+    flex: 1;
+    padding: 20px;
+    overflow-y: auto;
+}
+.panel { display: none; }
+.panel.active { display: block; }
+
+/* CARDS */
+.card-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+    gap: 20px;
+    margin-top: 20px;
+}
+.card {
+    background: var(--panel-bg);
+    border: 1px solid var(--border-color);
+    padding: 15px;
+    border-radius: 4px;
+    transition: border 0.2s ease;
+}
+.card:hover {
+    border-color: #444454;
+}
+
+.action-btn, .combat-btn {
+    width: 100%;
+    background: #1c1c24;
+    border: 1px solid var(--border-color);
+    color: var(--text-main);
+    padding: 8px;
+    cursor: pointer;
+    margin-top: 10px;
+}
+.action-btn:hover:not(:disabled) {
+    border-color: var(--curse-blue);
+}
+
+/* COMBAT FEED */
+#combat-screen {
+    background: #050507;
+    border: 1px solid var(--border-color);
+    height: 400px;
+    display: flex;
+    flex-direction: column;
+}
+#combat-log {
+    flex: 1;
+    padding: 15px;
+    overflow-y: auto;
+    font-size: 14px;
+    line-height: 1.5;
+}
+.log-system { color: var(--text-muted); }
+.log-player { color: var(--curse-blue); }
+.log-enemy { color: var(--domain-red); }
+
+#combat-actions {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 5px;
+    padding: 10px;
+    background: var(--panel-bg);
+}
+
+/* DOMAIN OVERLAY VISUALS */
+#domain-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: black;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 999;
+    opacity: 0;
+    pointer-events: none;
+}
+#domain-overlay.animate {
+    animation: domainFlash 3s forwards;
+}
+.domain-title {
+    color: white;
+    font-size: 3rem;
+    letter-spacing: 10px;
+    text-shadow: 0 0 20px var(--domain-red);
+}
+
+@keyframes domainFlash {
+    0% { opacity: 0; background: #000; }
+    15% { opacity: 1; background: #fff; }
+    30% { background: #000; }
+    85% { opacity: 1; }
+    100% { opacity: 0; }
+}
+
+/* ADVANCED TERMINAL SCROLLBAR */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: var(--bg-dark); }
+::-webkit-scrollbar-thumb { background: var(--border-color); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--curse-blue); }
+
+.hidden { display: none !important; }
