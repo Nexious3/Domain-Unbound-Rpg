@@ -1,9 +1,9 @@
-// combat.js - Player 3 (The Tactician Engine)
+// combat.js - Player 3 (The Tactician Engine) - Integrated with Player 4
 
 // Grade Multipliers dictate enemy power scaling and reward scaling
 const GRADE_BALANCING = {
-    "Fly Head":       { powerMod: 0.5, expReward: 10,  cashReward: 5   },
-    "Grade 4":        { powerMod: 1.0, expReward: 30,  cashReward: 20  },
+    "Fly Head":       { powerMod: 0.5, expReward: 10,   cashReward: 5   },
+    "Grade 4":        { powerMod: 1.0, expReward: 30,   cashReward: 20  },
     "Grade 3":        { powerMod: 1.5, expReward: 100, cashReward: 50  },
     "Grade 2":        { powerMod: 2.5, expReward: 350, cashReward: 150 },
     "Grade 1":        { powerMod: 4.0, expReward: 1200, cashReward: 500},
@@ -18,8 +18,15 @@ export class CombatEngine {
     constructor(globalState, enemyData) {
         this.state = globalState; // Reference to the core game state
         
-        // Tracking temporary combat pools so we don't permanently destroy their stats during a fight
-        this.playerCombatHP = globalState.maxHp || 100;
+        // FIX: Inject structural fallbacks if Player 1's state hasn't initialized them yet
+        if (this.state.maxHp === undefined) this.state.maxHp = 100;
+        if (this.state.attackPower === undefined) this.state.attackPower = 20;
+        if (this.state.maxCursedEnergy === undefined) this.state.maxCursedEnergy = 100;
+        if (this.state.exp === undefined) this.state.exp = 0;
+        if (this.state.money === undefined) this.state.money = 0;
+
+        // Tracking temporary combat pools
+        this.playerCombatHP = globalState.maxHp;
         this.playerCombatCE = globalState.cursedEnergy || 50;
 
         this.enemy = {
@@ -46,16 +53,17 @@ export class CombatEngine {
         const gradeConfig = GRADE_BALANCING[this.enemy.grade] || GRADE_BALANCING["Grade 4"];
 
         // Pull prestige multipliers from Player 1's state.js (defaulting to 1 if not set yet)
-        const heavenlyRestrictionMultiplier = this.state.prestigeMultipliers?.heavenlyRestriction || 1.0;
-        const techniqueRefinementMultiplier = this.state.prestigeMultipliers?.techniqueRefinement || 1.0;
+        const prestigeMod = this.state.prestigeMultiplier || 1.0;
+        const heavenlyRestrictionMultiplier = this.state.prestigeMultipliers?.heavenlyRestriction || prestigeMod;
+        const techniqueRefinementMultiplier = this.state.prestigeMultipliers?.techniqueRefinement || prestigeMod;
 
         // 1. Player Action Phase
         if (playerChoice === "basic") {
             // Replenish CE in combat pool
-            this.playerCombatCE = Math.min(this.state.maxCursedEnergy || 100, this.playerCombatCE + 12);
+            this.playerCombatCE = Math.min(this.state.maxCursedEnergy, this.playerCombatCE + 12);
             
             // Physical attacks scale with Heavenly Restriction prestige!
-            playerDamage = (this.state.attackPower || 20) * heavenlyRestrictionMultiplier; 
+            playerDamage = this.state.attackPower * heavenlyRestrictionMultiplier; 
             logMessages.push(`${this.state.sorcererName || 'You'} landed a physical punch!`);
         } 
         else if (playerChoice === "technique") {
@@ -63,19 +71,29 @@ export class CombatEngine {
                 this.playerCombatCE -= 40;
                 
                 // Cursed techniques scale with Technique Refinement prestige!
-                playerDamage = (this.state.attackPower || 20) * 3 * techniqueRefinementMultiplier; 
+                playerDamage = this.state.attackPower * 3 * techniqueRefinementMultiplier; 
                 logMessages.push(`${this.state.sorcererName || 'You'} unleashed a refined Cursed Technique!`);
             } else {
                 logMessages.push(`Not enough Cursed Energy! Dealt a desperate strike.`);
-                playerDamage = (this.state.attackPower || 20) * 0.5;
+                playerDamage = this.state.attackPower * 0.5;
             }
         }
         else if (playerChoice === "domain") {
-            if (this.playerCombatCE >= 100 && !this.isDomainActive) {
-                this.playerCombatCE -= 100;
+            // INTEGRATION: Verify Player 4's custom Domain costs and state criteria
+            const domainCost = window.playerAbilitiesState?.domainCeCost || 100;
+            const isBrainFried = window.playerAbilitiesState?.brainFryTurns > 0;
+
+            if (isBrainFried) {
+                logMessages.push(`❌ Domain Expansion failed! Your brain is fried for ${window.playerAbilitiesState.brainFryTurns} more turns!`);
+            } else if (this.playerCombatCE >= domainCost && !this.isDomainActive) {
+                this.playerCombatCE -= domainCost;
                 this.isDomainActive = true;
                 this.domainOwner = "player";
-                logMessages.push(`${this.state.sorcererName || 'You'} declared: DOMAIN EXPANSION!`);
+                
+                // Trigger Player 6 UI Flash Animation Hook
+                if (typeof window.triggerDomainVisuals === "function") {
+                    window.triggerDomainVisuals("Domain Unbound");
+                }
             } else {
                 logMessages.push(`Domain Expansion failed or already active.`);
             }
@@ -99,6 +117,10 @@ export class CombatEngine {
             }
 
             logMessages.push(`Exorcism Complete! Gained ${gradeConfig.expReward} EXP.`);
+            
+            // Post-combat cooldown cleanup
+            if (typeof window.tickAbilitiesCooldowns === "function") window.tickAbilitiesCooldowns();
+            
             return this.compileSummary(logMessages, "VICTORY");
         }
 
@@ -106,13 +128,27 @@ export class CombatEngine {
         let enemyDamage = this.enemy.rawPower * gradeConfig.powerMod;
         if (this.domainOwner === "player") enemyDamage *= 0.7; // Domain defense reduction
 
+        // INTEGRATION: Pass attack calculations through Player 4's Infinity defensive filter
+        if (typeof window.processInfinityDefense === "function") {
+            enemyDamage = window.processInfinityDefense(this, enemyDamage);
+        }
+
         this.playerCombatHP = Math.max(0, this.playerCombatHP - Math.floor(enemyDamage));
-        logMessages.push(`${this.enemy.name} counters, dealing ${Math.floor(enemyDamage)} damage.`);
+        
+        if (enemyDamage > 0) {
+            logMessages.push(`${this.enemy.name} counters, dealing ${Math.floor(enemyDamage)} damage.`);
+        }
 
         // Evaluate Defeat Condition
         if (this.playerCombatHP <= 0) {
             logMessages.push(`You were overwhelmed by the cursed spirit...`);
+            if (typeof window.tickAbilitiesCooldowns === "function") window.tickAbilitiesCooldowns();
             return this.compileSummary(logMessages, "DEFEAT");
+        }
+
+        // Maintenance phase at end of active turn
+        if (typeof window.tickAbilitiesCooldowns === "function") {
+            window.tickAbilitiesCooldowns();
         }
 
         this.turnCounter++;
