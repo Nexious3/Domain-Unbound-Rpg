@@ -1,85 +1,99 @@
-class CoreState{
-    constructor(){
-        this.grade = 1;// ранга на играча
-        this.CursedEnergy = 0; //ресурсът, който се генерира всяка секунда
-        this.sorcererLevel = 1; // нивото на играча
+class CoreState {
+    constructor() {
+        
+        this.grade = 4;                 
+        this.level = 1;
+        this.exp = 0;
 
-        this.rebirthCount = 0; // колко пъти е правен Prestige (Rebirth)
-        this.prestigeMultiplier = 1; // постоянен бонус, който се увеличава след Prestige
+      
+        this.attackPower = 5;
+        this.maxHp = 100;
+        this.currentHp = this.maxHp;
 
-        this.lastTick = Date.now(); // времето на последния tick (за да знаем колко секунди са минали)
+        
+        this.cursedEnergy = 0;
+        this.maxCursedEnergy = 100;
 
+        
+        this.money = 0;
+
+        
+        this.rebirthCount = 0;
+        this.prestigeMultiplier = 1;
+
+        
+        this.lastTick = Date.now();
+
+        // Auto-load saved data
         this.load();
     }
 
-     tick() { // Взима текущото време
+    
+    tick() {
         const now = Date.now();
-        const seconds = (now - this.lastTick) / 1000; // Изчислява колко секунди са минали
+        const seconds = (now - this.lastTick) / 1000;
 
         if (seconds >= 1) {
-            this.generateEnergy(seconds);
-            this.lastTick = now; // Обновява времето на последния tick
+            this.generateCursedEnergy(seconds);
+            this.lastTick = now;
+            this.save();
         }
     }
 
-    generateEnergy(seconds) { // Generira resursi i drugi nechta 
-        const gain = seconds * (this.sorcererLevel * 2 + this.grade) * this.prestigeMultiplier;
-        this.cursedEnergy += gain;
+   
+    generateCursedEnergy(seconds) {
+        const gain =
+            seconds *
+            (this.level * 2 + this.grade) *
+            this.prestigeMultiplier;
+
+        this.cursedEnergy = Math.min(
+            this.cursedEnergy + gain,
+            this.maxCursedEnergy
+        );
     }
-
-    save() {
-    const data = {
-        grade: this.grade,
-        cursedEnergy: this.cursedEnergy,
-        sorcererLevel: this.sorcererLevel,
-        rebirthCount: this.rebirthCount,
-        prestigeMultiplier: this.prestigeMultiplier
-    };
-
-    localStorage.setItem("coreState", JSON.stringify(data));
-    }
-
- load() {
-    const saved = localStorage.getItem("coreState");
-    if (!saved) return; // няма запис
-
-    const data = JSON.parse(saved);
-
-    this.grade = data.grade;
-    this.cursedEnergy = data.cursedEnergy;
-    this.sorcererLevel = data.sorcererLevel;
-    this.rebirthCount = data.rebirthCount;
-    this.prestigeMultiplier = data.prestigeMultiplier;
-}
 
     
+    save() {
+        const data = {
+            grade: this.grade,
+            level: this.level,
+            exp: this.exp,
+            attackPower: this.attackPower,
+            maxHp: this.maxHp,
+            currentHp: this.currentHp,
+            cursedEnergy: this.cursedEnergy,
+            maxCursedEnergy: this.maxCursedEnergy,
+            money: this.money,
+            rebirthCount: this.rebirthCount,
+            prestigeMultiplier: this.prestigeMultiplier
+        };
+
+        localStorage.setItem("globalGameState", JSON.stringify(data));
+    }
+
+    load() {
+        const saved = localStorage.getItem("globalGameState");
+        if (!saved) return;
+
+        const data = JSON.parse(saved);
+
+        this.grade = data.grade;
+        this.level = data.level;
+        this.exp = data.exp;
+        this.attackPower = data.attackPower;
+        this.maxHp = data.maxHp;
+        this.currentHp = data.currentHp;
+        this.cursedEnergy = data.cursedEnergy;
+        this.maxCursedEnergy = data.maxCursedEnergy;
+        this.money = data.money;
+        this.rebirthCount = data.rebirthCount;
+        this.prestigeMultiplier = data.prestigeMultiplier;
+    }
 }
 
-class PrestigeManager {
-    static canPrestige(state) {
-        return state.cursedEnergy >= 100000;
-    }
+// Create global game state
+window.globalGameState = new CoreState();
 
-    static doPrestige(state) {
-        state.rebirthCount++;
-        state.prestigeMultiplier += 0.25;
-
-        state.cursedEnergy = 0;
-        state.grade = 1;
-        state.sorcererLevel = 1;
-    }
-}
-
-class TickManager {
-    constructor(state) {
-        this.state = state;
-    }
-
-    start() {
-        setInterval(() => {
-            this.state.tick();
-        }, 100);
-    }
-}
-
-export { CoreState, PrestigeManager, TickManager };
+// Export class for other modules
+export { CoreState };
