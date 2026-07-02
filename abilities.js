@@ -1,5 +1,4 @@
 
-
 window.playerAbilitiesState = {
     hasInfinityActive: true,
     brainFryTurns: 0,
