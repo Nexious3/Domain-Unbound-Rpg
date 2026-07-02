@@ -7,69 +7,15 @@
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <div id="game-container">
-        <header id="hud">
-            <div class="stat-box">Grade: <span id="hud-grade">4th Grade</span></div>
-            <div class="stat-box">Cursed Energy: <span id="hud-ce">0</span></div>
-            <div class="stat-box">Sorcerer Level: <span id="hud-level">1</span></div>
-        </header>
+    
+    <!-- Player 6 will build the visual layout interface here -->
 
-        <div id="main-layout">
-            <nav id="sidebar">
-                <button class="nav-btn" data-target="training-panel">Training</button>
-                <button class="nav-btn" data-target="combat-panel">Missions</button>
-                <button class="nav-btn" data-target="domain-panel">Domain Tuning</button>
-            </nav>
-
-            <main id="viewport">
-                <section id="training-panel" class="panel">
-                    <h2>Physical & Spiritual Discipline</h2>
-                    <div class="card-grid" id="training-list">
-                        <!-- Instantiated Dynamically via Player 2 (training.js) -->
-                    </div>
-                </section>
-
-                <section id="combat-panel" class="panel">
-                    <h2>Cursed Spirit Extermination</h2>
-                    <div id="combat-screen">
-                        <div id="combat-log"></div>
-                        <div id="combat-actions">
-                            <button class="combat-btn" id="btn-attack" disabled>Basic Attack</button>
-                            <button class="combat-btn" id="btn-technique" disabled>Cursed Technique</button>
-                            <button id="domain-expansion-btn" class="domain-btn" disabled>DOMAIN EXPANSION</button>
-                        </div>
-                    </div>
-
-                    <!-- Target Canvas Array Area managed dynamically by Player 6 (app.js) -->
-                    <div class="card-grid" id="mission-selection-list" style="margin-top: 20px;">
-                        <!-- Enemy Cursed Spirits Spawn Here -->
-                    </div>
-                </section>
-
-                <section id="domain-panel" class="panel">
-                    <h2>Innate Techniques & Domains</h2>
-                    <div class="card-grid" id="abilities-list">
-                        <!-- Instantiated Dynamically via Player 4 (abilities.js) -->
-                    </div>
-                </section>
-            </main>
-        </div>
-    </div>
-
-    <!-- Fullscreen Visual Animation Portal managed via Player 6 and triggered by Player 4 -->
-    <div id="domain-overlay" class="hidden">
-        <h1 class="domain-title">DOMAIN EXPANSION</h1>
-    </div>
-
-    <!-- 
-      CRITICAL REPAIR: Script files converted to type="module". 
-      Fixes the browser core security execution boundary errors. 
-    -->
-    <script type="module" src="state.js"></script>
-    <script type="module" src="training.js"></script>
-    <script type="module" src="combat.js"></script>
-    <script type="module" src="abilities.js"></script>
-    <script type="module" src="assets.js"></script>
-    <script type="module" src="app.js"></script>
+    <!-- THE JUJUTSU ENGINE MATRIX (Loaded in mathematical dependency order) -->
+    <script src="state.js"></script>
+    <script src="assets.js"></script>
+    <script src="training.js"></script>
+    <script src="abilities.js"></script>
+    <script src="combat.js"></script>
+    <script src="app.js"></script>
 </body>
 </html>
