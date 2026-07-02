@@ -1,351 +1,266 @@
-// combat.js - Player 3 (The Tactician Engine) - Advanced Production Engine V4.0
+// combat.js - Advanced Tactical Math Engine (Player 3)
 
-// Grade Multipliers dictate enemy power scaling and reward scaling
-const GRADE_BALANCING = {
-    "Fly Head":       { powerMod: 0.5, expReward: 10,   cashReward: 5,   dropChance: 0.12 },
-    "Grade 4":        { powerMod: 1.0, expReward: 30,   cashReward: 20,  dropChance: 0.25 },
-    "Grade 3":        { powerMod: 1.5, expReward: 100, cashReward: 50,  dropChance: 0.40 },
-    "Grade 2":        { powerMod: 2.5, expReward: 350, cashReward: 150, dropChance: 0.55 },
-    "Grade 1":        { powerMod: 4.0, expReward: 1200, cashReward: 500, dropChance: 0.80 },
-    "Special Grade":  { powerMod: 6.5, expReward: 5000, cashReward: 2000, dropChance: 1.00 }
-};
-
-// Rare loot rewards passed back to the global state inventory upon victory
-const LOOT_TABLE = [
-    { name: "Low-Grade Cursed Charm", type: "trinket", value: 50 },
-    { name: "Grade 2 Slaughter Demon", type: "weapon", value: 300 },
-    { name: "Cursed Energy Elixir", type: "consumable", value: 100 },
-    { name: "Special Grade Tool: Playful Cloud", type: "weapon", value: 2500 },
-    { name: "Sukuna Finger Fragment", type: "artifact", value: 10000 }
-];
-
-// Environmental Conditions initialized dynamically at the start of a fight
-const ENVIRONMENTAL_TRAITS = [
-    { name: "Clear Skies", desc: "Standard baseline operational parameters.", ceRegenBonus: 0, damageMod: 1.0 },
-    { name: "Midnight Veil", desc: "Dense cursed energy residue ambient humidity. +5 Cursed Energy regen per turn.", ceRegenBonus: 5, damageMod: 1.0 },
-    { name: "Dilapidated Domain", desc: "Structural integrity compromised. Danger high. All damage increased by 20%.", ceRegenBonus: 0, damageMod: 1.2 },
-    { name: "Heavy Downpour", desc: "Restricts physical maneuverability vectors. Basic attack damage reduced by 10%.", ceRegenBonus: 2, damageMod: 0.9 }
-];
-
+/**
+ * Handles all feature-rich turn-based combat calculations.
+ * Interacts directly with CoreState properties via window.globalGameState.
+ */
 export class CombatEngine {
     /**
-     * @param {Object} globalState - Directly passes Player 1's state object from state.js
-     * @param {Object} enemyData - Generated enemy data from the game world
+     * @param {Object} enemyData - The enemy object provided by your spawner/assets file
      */
-    constructor(globalState, enemyData) {
-        this.state = globalState; 
-        
-        // Structural validation fallback injection
-        if (this.state.maxHp === undefined) this.state.maxHp = 100;
-        if (this.state.attackPower === undefined) this.state.attackPower = 20;
-        if (this.state.maxCursedEnergy === undefined) this.state.maxCursedEnergy = 100;
-        if (this.state.exp === undefined) this.state.exp = 0;
-        if (this.state.money === undefined) this.state.money = 0;
-        if (this.state.inventory === undefined) this.state.inventory = [];
+    constructor(enemyData) {
+        // 1. Establish direct link to the core game state anchor
+        this.playerState = window.globalGameState;
 
-        // Tracking temporary localized combat pools
-        this.playerCombatHP = globalState.maxHp;
-        this.playerCombatCE = globalState.cursedEnergy || 50;
+        // 2. Safety recovery layer if player initiates combat while KO'd
+        if (this.playerState.currentHp <= 0) {
+            this.playerState.currentHp = this.playerState.maxHp;
+        }
 
+        // 3. Initialize Advanced Enemy Profile
         this.enemy = {
-            name: enemyData.name,
-            grade: enemyData.grade,
-            hp: enemyData.maxHp,
-            maxHp: enemyData.maxHp,
-            rawPower: enemyData.rawPower,
-            statusEffects: [],
-            stance: "NEUTRAL" // Dynamically alters AI scripts based on HP parameters
+            name: enemyData.name || "Unknown Curse",
+            maxHp: enemyData.maxHp || 50,
+            hp: enemyData.maxHp || 50,
+            rawPower: enemyData.rawPower || 5,
+            stance: "NEUTRAL", // NEUTRAL or DESPERATION
+            statusEffects: []  // Track temporary debuffs like Stunned
         };
-        
-        this.playerStatusEffects = []; 
-        this.isDomainActive = false;
-        this.domainOwner = null;
+
+        // 4. Combat Tracking Context Matrix
         this.turnCounter = 1;
-        
-        // Tactical Combat Flow Accumulators
+        this.isDomainActive = false;
         this.blackFlashStreak = 0;
-        this.divergentFistCharge = 0; // Tracks residual delayed kinetic impacts
-        
-        // Dynamic Environment Selector Initialization
-        const traitIndex = Math.floor(Math.random() * ENVIRONMENTAL_TRAITS.length);
-        this.activeEnvironment = ENVIRONMENTAL_TRAITS[traitIndex];
+        this.domainBurnoutTurns = 0; // Tracks neural fry after domain usage
+        this.playerStatusEffects = [];
     }
 
     /**
-     * Processes a single combat execution matrix frame
-     * @param {string} playerChoice - 'basic', 'technique', 'domain', 'heal', or 'flee'
-     * @returns {Object} Deep telemetry round summary object package for Player 6 UI tracking
+     * Executes one tactical action turn step
+     * @param {string} playerChoice - 'basic', 'technique', or 'domain'
+     * @returns {Object} Deep telemetry summary metrics for Player 6's rendering loop
      */
     processTurn(playerChoice) {
         let playerDamage = 0;
         let enemyDamage = 0;
-        let logMessages = [];
-        let hitResult = "HIT"; 
-        
-        const gradeConfig = GRADE_BALANCING[this.enemy.grade] || GRADE_BALANCING["Grade 4"];
-        const prestigeMod = this.state.prestigeMultiplier || 1.0;
-        const heavenlyRestrictionMultiplier = this.state.prestigeMultipliers?.heavenlyRestriction || prestigeMod;
-        const techniqueRefinementMultiplier = this.state.prestigeMultipliers?.techniqueRefinement || prestigeMod;
+        let logs = [];
+        let hitResult = "HIT"; // HIT, CRITICAL, BLACK_FLASH, MISS
+        let combatStatus = "CONTINUE"; 
 
-        // --- 0. BACKGROUND SYSTEM FRAME INITS ---
-        if (this.turnCounter === 1) {
-            logMessages.push(`🌐 Battlefield Condition: **${this.activeEnvironment.name}** (${this.activeEnvironment.desc})`);
-        }
+        const multiplier = this.playerState.prestigeMultiplier || 1;
 
-        // Apply pre-turn environmental and status modifications
-        this.applyStatusTicks(logMessages);
+        // --- 0. PRE-TURN PROCESSING & STATUS CHECK ---
+        if (this.domainBurnoutTurns > 0) this.domainBurnoutTurns--;
         
         if (this.hasStatus(this.playerStatusEffects, "Stunned")) {
-            logMessages.push(`❌ Your movement vectors are completely paralyzed! Action phase skipped.`);
+            logs.push(`❌ You are STUNNED and completely unable to move this turn!`);
             playerChoice = "skipped";
         }
 
-        // --- 1. USER ACTION RESOLUTION LAYER ---
-        if (playerChoice === "basic") {
-            const ceRegen = 15 + this.activeEnvironment.ceRegenBonus;
-            this.playerCombatCE = Math.min(this.state.maxCursedEnergy, this.playerCombatCE + ceRegen);
-            
-            // Apply environmental base adjustment scales
-            playerDamage = this.state.attackPower * heavenlyRestrictionMultiplier * this.activeEnvironment.damageMod;
-            
-            // Evaluate Divergent Fist kinetic delay accumulation
-            if (this.divergentFistCharge > 0) {
-                const bonusKinetic = playerDamage * 0.5 * this.divergentFistCharge;
-                playerDamage += bonusKinetic;
-                logMessages.push(`💥 Divergent Fist Burst! Delayed cursed energy snapped shut, adding +${Math.floor(bonusKinetic)} damage!`);
-                this.divergentFistCharge = 0; 
-            }
+        // Dynamic CE Volatility Factor (+/- 10% efficiency drift each turn)
+        const sparkVolatility = 0.9 + (Math.random() * 0.2);
 
-            // Core Black Flash Formula Evaluation (Base 5% scale modified by streak factors)
-            const flashRngChance = 0.05 + (this.blackFlashStreak * 0.02);
-            if (Math.random() < flashRngChance) {
+        // ==========================================
+        // PHASE 1: PLAYER ACTIONS & CRITICAL SPARKS
+        // ==========================================
+        if (playerChoice === "basic") {
+            // Basic strikes generate Cursed Energy modulated by volatility
+            const ceGained = Math.floor(15 * sparkVolatility);
+            this.playerState.cursedEnergy = Math.min(
+                this.playerState.maxCursedEnergy,
+                this.playerState.cursedEnergy + ceGained
+            );
+            
+            playerDamage = this.playerState.attackPower * multiplier;
+
+            // Algorithmic Black Flash Probability Check (Increases slightly with consecutive hits)
+            const flashChance = 0.05 + (this.blackFlashStreak * 0.03);
+            if (Math.random() < flashChance) {
                 this.blackFlashStreak++;
                 hitResult = "BLACK_FLASH";
-                playerDamage = Math.pow(playerDamage, 1.25) * 2.5; 
-                this.playerCombatCE = Math.min(this.state.maxCursedEnergy, this.playerCombatCE + 40);
+                playerDamage = Math.pow(playerDamage, 1.2) * 2.5; // Exponential scale scaling
                 
-                logMessages.push(`⚡ BLACK FLASH! The spatial framework distorts in black lightning! Your core focus deepens.`);
+                // Floods the user with massive bonus energy 
+                this.playerState.cursedEnergy = Math.min(this.playerState.maxCursedEnergy, this.playerState.cursedEnergy + 30);
+                logs.push(`⚡ BLACK FLASH! Sparks of black spatial distortion erupt! Dealt ${Math.floor(playerDamage)} damage and completely restored combat focus!`);
+                
+                // Stuns the enemy for 1 turn frame due to impact shock
                 this.inflictStatus(this.enemy.statusEffects, "Stunned", 1);
             } else {
-                this.blackFlashStreak = 0;
-                if (Math.random() < 0.12) {
-                    hitResult = "CRITICAL";
-                    playerDamage *= 1.5;
-                    logMessages.push(`🎯 Precision Strike! Hit a vulnerable node in the core matrix.`);
-                } else {
-                    logMessages.push(`${this.state.sorcererName || 'You'} executed a precise martial combo.`);
-                    // Charge Divergent Fist framework if standard hits connect cleanly
-                    this.divergentFistCharge = Math.min(3, this.divergentFistCharge + 1);
-                }
+                this.blackFlashStreak = 0; // Reset streak on normal hit
+                logs.push(`⚔️ You strike ${this.enemy.name} for ${Math.floor(playerDamage)} damage. Gained +${ceGained} CE.`);
             }
         } 
+        
         else if (playerChoice === "technique") {
             this.blackFlashStreak = 0;
-            if (this.playerCombatCE >= 40) {
-                this.playerCombatCE -= 40;
-                playerDamage = this.state.attackPower * 3 * techniqueRefinementMultiplier * this.activeEnvironment.damageMod; 
-                playerDamage *= (0.85 + Math.random() * 0.3); // High variance output range
+            const baseTechCost = 30;
+            const dynamicTechCost = Math.floor(baseTechCost * sparkVolatility);
 
-                logMessages.push(`${this.state.sorcererName || 'You'} channel concentrated energy into an active Cursed Technique!`);
-                
-                if (Math.random() < 0.45) {
-                    this.inflictStatus(this.enemy.statusEffects, "Poisoned", 2);
-                    logMessages.push(`🧪 Corrosive residue clinging to target entity! Inflicted Poison status trait.`);
-                }
+            if (this.domainBurnoutTurns > 0) {
+                logs.push(`⚠️ Tech Blocked: Your brain's technique mapping is fried from your Domain Expansion! (${this.domainBurnoutTurns} turns left)`);
+                playerDamage = 0;
+            } else if (this.playerState.cursedEnergy >= dynamicTechCost) {
+                this.playerState.cursedEnergy -= dynamicTechCost;
+                playerDamage = this.playerState.attackPower * 3.5 * multiplier;
+                logs.push(`💥 Cursed Technique unleashed! Hit ${this.enemy.name} for ${Math.floor(playerDamage)} damage. (Spent ${dynamicTechCost} CE)`);
             } else {
-                logMessages.push(`⚠️ Execution Failed: Insufficient Cursed Energy reserves! Delivered a low-output punch.`);
-                playerDamage = this.state.attackPower * 0.35;
+                playerDamage = Math.floor(this.playerState.attackPower * 0.4 * multiplier);
+                logs.push(`⚠️ Energy Failure: Your curse control faltered. Dealt a weak physical punch for ${playerDamage} damage.`);
             }
-        }
+        } 
+        
         else if (playerChoice === "domain") {
             this.blackFlashStreak = 0;
-            const domainCost = window.playerAbilitiesState?.domainCeCost || 100;
-            const isBrainFried = window.playerAbilitiesState?.brainFryTurns > 0;
+            const domainCost = 80;
 
-            if (isBrainFried) {
-                logMessages.push(`❌ Domain Command Refused: Core neurological pathing is short-circuited.`);
-            } else if (this.playerCombatCE >= domainCost && !this.isDomainActive) {
-                this.playerCombatCE -= domainCost;
+            if (this.domainBurnoutTurns > 0) {
+                logs.push(`❌ Failed: Your brain is too fatigued to open another Domain yet!`);
+            } else if (this.playerState.cursedEnergy >= domainCost && !this.isDomainActive) {
+                this.playerState.cursedEnergy -= domainCost;
                 this.isDomainActive = true;
-                this.domainOwner = "player";
-                hitResult = "DOMAIN_EXPANSION";
-                
-                logMessages.push(`🌌 "DOMAIN EXPANSION!" Spatial construct deployed successfully. Ultimate secure hit rate established.`);
-                this.inflictStatus(this.enemy.statusEffects, "Enraged", 2); 
-                
-                if (typeof window.triggerDomainVisuals === "function") {
-                    window.triggerDomainVisuals("Domain Unbound");
-                }
+                playerDamage = this.playerState.attackPower * 6 * multiplier;
+                logs.push(`🌌 "DOMAIN EXPANSION!" Spatial barriers enclose reality. You deal a massive environment initialization blow of ${Math.floor(playerDamage)} damage!`);
+            } else if (this.isDomainActive) {
+                playerDamage = this.playerState.attackPower * 2.5 * multiplier;
+                logs.push(`👁️ Inescapable Environment: Your attacks trigger automatically within the barrier space for ${Math.floor(playerDamage)} damage.`);
             } else {
-                logMessages.push(`⚠️ Construct Conflict: Domain mechanics already established inside this layer.`);
-            }
-        }
-        else if (playerChoice === "heal") {
-            this.blackFlashStreak = 0;
-            if (this.playerCombatCE >= 30) {
-                this.playerCombatCE -= 30;
-                const healAmount = Math.floor(this.state.maxHp * 0.40); // 40% Scale recovery efficiency
-                this.playerCombatHP = Math.min(this.state.maxHp, this.playerCombatHP + healAmount);
-                logMessages.push(`✨ Reverse Cursed Technique! Cellular tissue array structures forced into complete reconstruction (+${healAmount} HP).`);
-            } else {
-                logMessages.push(`❌ Execution Error: CE density threshold insufficient to compute cell conversion.`);
-            }
-        }
-        else if (playerChoice === "flee") {
-            const escapeChance = this.enemy.grade === "Special Grade" ? 0.15 : 0.60;
-            if (Math.random() < escapeChance) {
-                logMessages.push(`🏃‍♂️ Safety Perimeter Breached: Successfully escaped current encounter frame context.`);
-                return this.compileSummary(logMessages, "FLED", "FLEE");
-            } else {
-                logMessages.push(`⚠️ Escape Vector Denied: Target intercept speed blocked extraction pathing.`);
+                playerDamage = this.playerState.attackPower * multiplier;
+                logs.push(`⚠️ Energy insufficient for Domain Expansion! Deployed a quick standard strike for ${playerDamage} damage.`);
             }
         }
 
-        // Apply active global modifications
-        if (this.domainOwner === "player") playerDamage *= 1.5; 
-        if (this.hasStatus(this.playerStatusEffects, "Enraged")) playerDamage *= 1.25;
-
-        // Enemy Dodge Evasion Sub-Routine
-        const enemyDodgeChance = this.enemy.grade === "Special Grade" ? 0.18 : (this.enemy.grade === "Grade 1" ? 0.08 : 0.02);
-        if (Math.random() < enemyDodgeChance && !["domain", "heal", "flee"].includes(playerChoice) && this.domainOwner !== "player") {
-            playerDamage = 0;
-            hitResult = "MISS";
-            logMessages.push(`💨 Target evasion sweep complete: The ${this.enemy.name} slipped out of engagement frame lines.`);
+        // Apply Domain Inescapable Hit Modifier rules
+        if (this.isDomainActive && playerChoice !== "domain" && playerDamage > 0) {
+            playerDamage *= 1.6; // 60% standard structural domain damage amplification
         }
 
-        // Deduct target metrics safety allocation
-        this.enemy.hp = Math.max(0, this.enemy.hp - Math.floor(playerDamage));
+        // Deal core calculation results directly to the enemy target pool
+        if (playerDamage > 0) {
+            this.enemy.hp = Math.max(0, this.enemy.hp - Math.floor(playerDamage));
+        }
 
-        // Evaluate Ultimate Victory Condition
+        // Evaluate Instant Victory Metrics
         if (this.enemy.hp <= 0) {
-            this.state.exp += gradeConfig.expReward;
-            this.state.money += gradeConfig.cashReward;
+            combatStatus = "VICTORY";
             
-            let dropItem = null;
-            if (Math.random() < gradeConfig.dropChance) {
-                const randomIdx = Math.floor(Math.random() * LOOT_TABLE.length);
-                dropItem = LOOT_TABLE[randomIdx];
-                this.state.inventory.push(dropItem);
-            }
+            // Scaled dynamic progression rewards tied to enemy scaling parameters
+            const expGained = enemyData.expReward || (this.playerState.level * 15);
+            const cashGained = enemyData.moneyReward || (this.playerState.level * 10);
 
-            if (typeof this.state.checkForLevelUp === "function") this.state.checkForLevelUp();
-
-            logMessages.push(`💀 TARGET EXORCISED: Allocation tracking cleared. Gained +${gradeConfig.expReward} EXP.`);
-            if (dropItem) logMessages.push(`🎁 [PREROGATIVE DROP SECURED] Registered artifact token: **${dropItem.name}**.`);
+            this.playerState.exp += expGained;
+            this.playerState.money += cashGained;
             
-            this.cleanupCombatContext();
-            return this.compileSummary(logMessages, "VICTORY", hitResult);
+            // Clean dynamic state configurations
+            if (this.isDomainActive) this.domainBurnoutTurns = 3; // Trigger technique lockout upon win/exit
+            
+            this.playerState.save(); 
+
+            logs.push(`💀 Threat Extinguished: ${this.enemy.name} has been systematically exorcised! Gained +${expGained} EXP and +$${cashGained}.`);
+            return this.compileSummary(logs, combatStatus, hitResult);
         }
 
-        // --- 2. DYNAMIC ENEMY INTEL PHASE (AI STANCES) ---
+        // ==========================================
+        // PHASE 2: ADVANCED ENEMY AI STANCE & OUTBOUND DEFENSE
+        // ==========================================
+        
+        // Stance Shift Hook: Low HP forces curses to go wild
         if ((this.enemy.hp / this.enemy.maxHp) <= 0.35 && this.enemy.stance !== "DESPERATION") {
             this.enemy.stance = "DESPERATION";
-            logMessages.push(`🚨 Threat Alert: ${this.enemy.name} core fluctuates wildly! It enters a hyper-aggressive Desperation Stance!`);
+            logs.push(`🚨 Threat Escalation: ${this.enemy.name}'s aura distorts wildly into a Desperation Stance! Its attack damage will spike!`);
         }
 
-        if (!this.hasStatus(this.enemy.statusEffects, "Stunned")) {
-            enemyDamage = this.enemy.rawPower * gradeConfig.powerMod * this.activeEnvironment.damageMod;
-            
-            // Stance modification behaviors
+        // Process enemy strike execution if they are not stunned or dead
+        if (!this.hasStatus(this.enemy.statusEffects, "Stunned") && playerChoice !== "flee") {
+            enemyDamage = this.enemy.rawPower;
+
+            // Apply stance buffs to enemy raw output
             if (this.enemy.stance === "DESPERATION") {
-                enemyDamage *= 1.45; // Extreme damage output spike
+                enemyDamage *= 1.5; // 50% damage boost when desperate
             }
-            if (this.domainOwner === "player") {
-                enemyDamage *= 0.60; 
-            }
-            if (this.hasStatus(this.enemy.statusEffects, "Enraged")) {
-                enemyDamage *= 1.20;
+            // Domain environment suppresses enemy tracking control loops
+            if (this.isDomainActive) {
+                enemyDamage *= 0.70; // Enemy deals 30% less damage trapped inside your domain
             }
 
-            // Route through defense filtering hooks
+            // CRUCIAL EXPLICIT INTERCEPTION REQUIREMENT HOOK
             if (typeof window.processInfinityDefense === "function") {
                 enemyDamage = window.processInfinityDefense(this, enemyDamage);
             }
 
-            this.playerCombatHP = Math.max(0, this.playerCombatHP - Math.floor(enemyDamage));
+            // Deduct from your native CoreState player health tracker
+            this.playerState.currentHp = Math.max(0, this.playerState.currentHp - Math.floor(enemyDamage));
             
             if (enemyDamage > 0) {
-                logMessages.push(`💥 Offensive Impact: Taken ${Math.floor(enemyDamage)} damage from ${this.enemy.name}.`);
-                if (Math.random() < 0.15 && this.enemy.stance === "DESPERATION") {
+                logs.push(`💥 ${this.enemy.name} retaliates, crushing your vitals for ${Math.floor(enemyDamage)} damage.`);
+                
+                // Sneak stun chance if hit with massive power in desperation mode
+                if (this.enemy.stance === "DESPERATION" && Math.random() < 0.15) {
                     this.inflictStatus(this.playerStatusEffects, "Stunned", 1);
-                    logMessages.push(`💫 Heavy concussive impact! You are Stunned for 1 turn frame.`);
+                    logs.push(`💫 Impact Overload: The curse's brutal desperation swing has STUNNED you for next turn!`);
                 }
             } else {
-                logMessages.push(`🛡️ Defensive Intercept: Active shielding variables dropped damage to zero.`);
+                logs.push(`🛡️ Limitless Void: Your automated Infinity barrier stopped all incoming pressure vectors completely.`);
             }
-        } else {
-            logMessages.push(`💤 Stun lock verified: Target frame skipping active. No attack executed.`);
+        } else if (this.hasStatus(this.enemy.statusEffects, "Stunned")) {
+            logs.push(`💤 Enemy is currently Stunned and completely skipped their combat execution window.`);
         }
 
-        // Evaluate Defeat Verification Condition
-        if (this.playerCombatHP <= 0) {
-            logMessages.push(`❌ Defeat Framework Triggered: Vital signs flatlining. Extraction protocol offline.`);
-            this.cleanupCombatContext();
-            return this.compileSummary(logMessages, "DEFEAT", hitResult);
+        // Evaluate Defeat State Checks
+        if (this.playerState.currentHp <= 0) {
+            combatStatus = "DEFEAT";
+            if (this.isDomainActive) this.isDomainActive = false;
+            logs.push(`❌ Status Terminal: Defeated in battle. Auto-archiving local state progress metrics...`);
+            this.playerState.save();
         }
 
-        // --- 3. RECOVERY SYSTEM CLEANUP TICK ---
-        this.decrementStatusDurations();
-        if (typeof window.tickAbilitiesCooldowns === "function") window.tickAbilitiesCooldowns();
+        // Tick off turn durations for status effect lists
+        this.tickDownStatusEffects();
 
         this.turnCounter++;
-        return this.compileSummary(logMessages, "CONTINUE", hitResult);
+        return this.compileSummary(logs, combatStatus, hitResult);
     }
 
-    // --- CORE FRAME UTILITY ENGINE METHODS ---
-    inflictStatus(targetArray, statusName, duration) {
-        const existing = targetArray.find(e => e.name === statusName);
-        if (existing) {
-            existing.duration = Math.max(existing.duration, duration);
+    // --- ENCAPSULATED SUB-UTILITIES ---
+
+    inflictStatus(array, statusName, duration) {
+        const match = array.find(s => s.name === statusName);
+        if (match) {
+            match.duration = Math.max(match.duration, duration);
         } else {
-            targetArray.push({ name: statusName, duration: duration });
+            array.push({ name: statusName, duration: duration });
         }
     }
 
-    hasStatus(targetArray, statusName) {
-        return targetArray.some(e => e.name === statusName && e.duration > 0);
+    hasStatus(array, statusName) {
+        return array.some(s => s.name === statusName && s.duration > 0);
     }
 
-    applyStatusTicks(logMessages) {
-        if (this.hasStatus(this.playerStatusEffects, "Poisoned")) {
-            const poisonDmg = Math.floor(this.state.maxHp * 0.05);
-            this.playerCombatHP = Math.max(1, this.playerCombatHP - poisonDmg);
-            logMessages.push(`🤢 System Alert: Poison decay active. Incurred -${poisonDmg} damage tick.`);
-        }
-        if (this.hasStatus(this.enemy.statusEffects, "Poisoned")) {
-            const poisonDmg = Math.floor(this.enemy.maxHp * 0.05);
-            this.enemy.hp = Math.max(0, this.enemy.hp - poisonDmg);
-            logMessages.push(`🧪 System Report: Target biological decay active. Inflicted -${poisonDmg} status damage.`);
-        }
+    tickDownStatusEffects() {
+        this.playerStatusEffects.forEach(s => s.duration--);
+        this.enemy.statusEffects.forEach(s => s.duration--);
+        this.playerStatusEffects = this.playerStatusEffects.filter(s => s.duration > 0);
+        this.enemy.statusEffects = this.enemy.statusEffects.filter(s => s.duration > 0);
     }
 
-    decrementStatusDurations() {
-        this.playerStatusEffects.forEach(e => e.duration--);
-        this.enemy.statusEffects.forEach(e => e.duration--);
-        this.playerStatusEffects = this.playerStatusEffects.filter(e => e.duration > 0);
-        this.enemy.statusEffects = this.enemy.statusEffects.filter(e => e.duration > 0);
-    }
-
-    cleanupCombatContext() {
-        this.playerStatusEffects = [];
-        this.enemy.statusEffects = [];
-        this.blackFlashStreak = 0;
-        this.divergentFistCharge = 0;
-        if (typeof window.tickAbilitiesCooldowns === "function") window.tickAbilitiesCooldowns();
-    }
-
-    compileSummary(messages, status, hitResult) {
+    /**
+     * Packs complex metadata summaries down seamlessly into Player 6's interface UI components
+     */
+    compileSummary(messages, combatStatus, hitResult) {
         return {
             logs: messages,
-            status: status,
+            status: combatStatus,
             hitResult: hitResult,
-            playerHp: this.playerCombatHP,
+            playerHp: this.playerState.currentHp,
+            playerMaxHp: this.playerState.maxHp,
+            playerCE: this.playerState.cursedEnergy,
+            playerMaxCE: this.playerState.maxCursedEnergy,
             enemyHp: this.enemy.hp,
-            playerCE: this.playerCombatCE,
-            environment: this.activeEnvironment.name,
-            divergentStacks: this.divergentFistCharge,
-            activePlayerStatuses: [...this.playerStatusEffects],
-            activeEnemyStatuses: [...this.enemy.statusEffects]
+            enemyMaxHp: this.enemy.maxHp,
+            enemyStance: this.enemy.stance,
+            burnoutTurns: this.domainBurnoutTurns,
+            turn: this.turnCounter,
+            domainActive: this.isDomainActive
         };
     }
 }
