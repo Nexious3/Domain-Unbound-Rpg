@@ -1,49 +1,235 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Player 6 - The Weaver UI</title>
-    <link rel="stylesheet" href="style.css">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Domain Unbound — Cursed Ledger</title>
+  <link rel="stylesheet" href="style.css" />
 </head>
 <body>
 
-    <header class="hud-header">
-        <div class="hud-status">Status: <span id="hud-status-text">Idle</span></div>
-        <div class="hud-score">Score: <span id="hud-score-text">0</span></div>
-    </header>
+  <header class="top-ledger">
+    <h1>DOMAIN UNBOUND</h1>
+    <div class="stat-ledger">
+      <div class="stat"><span class="stat-label">Grade</span><span class="stat-value" id="stat-grade">Grade 4</span></div>
+      <div class="stat"><span class="stat-label">Level</span><span class="stat-value" id="stat-level">1</span></div>
+      <div class="stat"><span class="stat-label">Yen</span><span class="stat-value" id="stat-money">0</span></div>
+      <div class="stat"><span class="stat-label">Power</span><span class="stat-value" id="stat-atk">0</span></div>
+      <div class="stat"><span class="stat-label">HP</span><span class="stat-value" id="stat-hp">0 / 0</span></div>
+      <div class="stat ce-meter">
+        <span class="stat-label">Cursed Energy — <span id="stat-ce">0 / 0</span></span>
+        <div class="ce-bar-track"><div class="ce-bar-fill" id="ce-bar-fill"></div></div>
+      </div>
+    </div>
+  </header>
 
-    <nav class="tab-navigation">
-        <button class="tab-btn active" data-target="panel-main">Main</button>
-        <button class="tab-btn" data-target="panel-data">Data Structures</button>
-        <button class="tab-btn" data-target="panel-logs">Combat Log</button>
-    </nav>
+  <nav class="tab-nav">
+    <button class="nav-tab active" data-tab="home">HOME</button>
+    <button class="nav-tab" data-tab="missions">MISSIONS</button>
+    <button class="nav-tab" data-tab="train">TRAIN</button>
+    <button class="nav-tab" data-tab="inventory">INVENTORY</button>
+    <button class="nav-tab" data-tab="combat">COMBAT</button>
+    <button class="nav-tab" data-tab="shop">SHOP</button>
+  </nav>
 
-    <main class="panel-container">
-        
-        <section id="panel-main" class="tab-panel active">
-            <h2>Actions</h2>
-            <div class="button-group">
-                <button id="btn-action-1" class="action-btn">Trigger Action 1</button>
-                <button id="btn-action-2" class="action-btn">Trigger Action 2</button>
+  <main>
+    <section id="panel-home" class="tab-panel active panel-section">
+      <div class="layout-grid">
+        <div class="card">
+          <h2>Sorcerer Evaluation</h2>
+          <p>Playtime: <span id="ui-playtime">0</span> secs</p>
+          <p>Curses Exorcised: <span id="ui-kills">0</span></p>
+          <hr>
+          <h3 class="gold-text">Current Directive</h3>
+          <p>Objective: Reach Special Grade.</p>
+        </div>
+        <div class="card">
+          <h2>Meditation & Training</h2>
+          <div id="training-grid" class="card-grid list-view"></div>
+        </div>
+      </div>
+    </section>
+
+    <section id="panel-missions" class="tab-panel panel-section">
+      <div class="layout-grid three-col">
+        <div class="card center-text">
+          <h2>Active Story Arc</h2>
+          <p>Arc: Prologue</p>
+          <button disabled>Enter Story</button>
+        </div>
+        <div class="card center-text">
+          <h2>Window Radar</h2>
+          <button id="btn-radar-search" class="action-btn w-100">Scan for Curses</button>
+          <div id="radar-result" style="display:none; margin-top: 1rem;">
+            <p class="muted-text">Threat Detected</p>
+            <h3 id="radar-target-name" class="red-text">Unknown</h3>
+            <button id="btn-radar-enter" class="danger-btn w-100">Lower Veil & Enter</button>
+          </div>
+        </div>
+        <div class="card center-text">
+          <h2>Bloodline Trials</h2>
+          <p class="muted-text">No further trials available.</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="panel-train" class="tab-panel panel-section">
+      <div class="layout-grid">
+        <div class="card">
+          <h2>Character Profile</h2>
+          <div id="profile-stats">
+            <p><strong>Clan:</strong> <span id="profile-clan">None</span></p>
+            <p><strong>Technique:</strong> <span id="profile-ct">None</span></p>
+            <p><strong>Trait:</strong> <span id="profile-trait">None</span></p>
+          </div>
+        </div>
+        <div class="card">
+          <h2>Genetic Rerolling</h2>
+          <div class="list-view">
+            <div class="card">
+              <div>
+                <h3 style="margin:0;">Clan Heritage</h3>
+                <p class="muted-text text-small" style="margin:0;">Rolls: <span id="ui-clan-rolls" class="gold-text">0</span></p>
+              </div>
+              <button id="btn-roll-clan" class="action-btn">REROLL</button>
             </div>
-        </section>
+            <div class="card">
+              <div>
+                <h3 style="margin:0;">Cursed Technique</h3>
+                <p class="muted-text text-small" style="margin:0;">Rolls: <span id="ui-ct-rolls" class="gold-text">0</span></p>
+              </div>
+              <button id="btn-roll-ct" class="action-btn">REROLL</button>
+            </div>
+            <div class="card">
+              <div>
+                <h3 style="margin:0;">Innate Trait</h3>
+                <p class="muted-text text-small" style="margin:0;">Rolls: <span id="ui-trait-rolls" class="gold-text">0</span></p>
+              </div>
+              <button id="btn-roll-trait" class="action-btn">REROLL</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
 
-        <section id="panel-data" class="tab-panel">
-            <h2>Dynamic Lists</h2>
-            <button id="btn-render-list" class="action-btn">Refresh Data List</button>
-            <ul id="dynamic-list">
-                </ul>
-        </section>
+    <section id="panel-inventory" class="tab-panel panel-section">
+      <div class="layout-grid">
+        <div class="card">
+          <h2>The Arsenal</h2>
+          <p class="muted-text">No cursed tools acquired yet. Visit the shop.</p>
+        </div>
+        <div class="card">
+          <h2>Combat Abilities</h2>
+          <div class="skill-grid">
+            <div class="skill active">Basic Strike</div>
+            <div class="skill active">Cursed Technique</div>
+            <div class="skill active">Domain Expansion</div>
+            <div class="skill locked">Black Flash Mastery</div>
+            <div class="skill locked">Reversed Cursed Technique</div>
+          </div>
+        </div>
+      </div>
+    </section>
 
-        <section id="panel-logs" class="tab-panel">
-            <h2>Combat Log</h2>
-            <div id="combat-log-container" class="log-container">
-                </div>
-        </section>
+    <section id="panel-combat" class="tab-panel panel-section">
+      <div id="combat-idle-screen" class="center-text">
+        <h2>No Active Combat</h2>
+        <p class="muted-text">Use the Window Radar in the Missions tab to find a curse.</p>
+      </div>
 
-    </main>
+      <div id="active-combat-ui" style="display:none;">
+        <div class="combat-arena">
+          <div class="combat-side">
+            <h3>You</h3>
+            <p>HP: <span id="combat-player-hp">0 / 0</span></p>
+            <p>CE: <span id="combat-player-ce">0 / 0</span></p>
+          </div>
+          <div class="vs-text">VS</div>
+          <div class="combat-side enemy-side">
+            <h3 id="combat-enemy-name" class="red-text">Enemy</h3>
+            <p>HP: <span id="combat-enemy-hp">0 / 0</span></p>
+          </div>
+        </div>
 
+<<<<<<< HEAD
+        <div id="combat-controls" class="action-bar">
+          <button id="btn-basic">
+             <div>Basic Strike</div>
+             <div id="ui-dmg-basic" class="gold-text text-small"></div>
+          </button>
+          <button id="btn-technique">
+             <div>Cursed Technique</div>
+             <div id="ui-dmg-tech" class="gold-text text-small"></div>
+          </button>
+          <button id="btn-domain">
+             <div>Domain Expansion</div>
+             <div id="ui-dmg-domain" class="gold-text text-small"></div>
+          </button>
+        </div>
+      </div>
+
+      <div id="combat-log" class="terminal-log"></div>
+    </section>
+
+    <section id="panel-shop" class="tab-panel panel-section">
+      <div class="card">
+        <h2 class="center-text">Black Market Arsenal</h2>
+        <p class="center-text">Yen Available: ¥<span id="shop-ui-yen" class="gold-text">0</span></p>
+        <div class="layout-grid three-col mt-2">
+            <div class="card center-text" style="background:#000;">
+                <h3>Clan Roll</h3>
+                <p class="muted-text text-small">¥1,000</p>
+                <button id="btn-buy-clan-roll" class="action-btn w-100 mt-1">PURCHASE</button>
+            </div>
+            <div class="card center-text" style="background:#000;">
+                <h3>Technique Roll</h3>
+                <p class="muted-text text-small">¥1,000</p>
+                <button id="btn-buy-ct-roll" class="action-btn w-100 mt-1">PURCHASE</button>
+            </div>
+            <div class="card center-text" style="background:#000;">
+                <h3>Trait Roll</h3>
+                <p class="muted-text text-small">¥1,000</p>
+                <button id="btn-buy-trait-roll" class="action-btn w-100 mt-1">PURCHASE</button>
+            </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <div id="domain-overlay">
+    <div class="domain-name">Domain Name</div>
+  </div>
+
+  <!-- Roll Animation Modal -->
+  <div id="roll-modal" class="modal-overlay" style="display:none;">
+    <div class="modal-content card">
+      <h2 id="roll-category-title" class="highlight-blue">Rolling...</h2>
+      <div id="roll-animation-text" class="roll-text">???</div>
+      <div id="roll-result-container" style="display:none;">
+        <h1 id="roll-result-name" class="roll-result">Name</h1>
+        <p id="roll-result-desc" class="muted-text">Desc</p>
+        <button id="btn-close-roll" class="action-btn mt-2 w-100">ACCEPT GENETICS</button>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="app.js"></script>
+=======
     <script type="module" src="app.js"></script>
     </body>
+    
+    <!-- Player 6 will build the visual layout interface here -->
+
+    <!-- THE JUJUTSU ENGINE MATRIX (Loaded in mathematical dependency order) -->
+    <script src="state.js"></script>
+    <script src="assets.js"></script>
+    <script src="training.js"></script>
+    <script src="abilities.js"></script>
+    <script src="combat.js"></script>
+    <script src="app.js"></script>
+<<<<<<< HEAD
+>>>>>>> 28333835967aee0818d128428bebac400165753a
+=======
+>>>>>>> 28333835967aee0818d128428bebac400165753a
+</body>
 </html>
